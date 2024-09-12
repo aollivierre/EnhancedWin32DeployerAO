@@ -1,55 +1,67 @@
 function Remove-IntuneWinFiles {
-
-
     <#
-.SYNOPSIS
+    .SYNOPSIS
     Removes all *.intuneWin files from a specified directory.
 
-.DESCRIPTION
+    .DESCRIPTION
     This function searches for all files with the .intuneWin extension
     in the specified directory and removes them. It logs actions taken
     and any errors encountered using the Write-EnhancedLog function.
 
-.PARAMETER DirectoryPath
+    .PARAMETER DirectoryPath
     The path to the directory from which *.intuneWin files will be removed.
 
-.EXAMPLE
+    .EXAMPLE
     Remove-IntuneWinFiles -DirectoryPath "d:\Users\aollivierre\AppData\Local\Intune-Win32-Deployer\apps-winget"
     Removes all *.intuneWin files from the specified directory and logs the actions.
 
-.NOTES
+    .NOTES
     Ensure you have the necessary permissions to delete files in the specified directory.
+    #>
 
-#>
-
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the directory path from which *.intuneWin files will be removed.")]
+        [ValidateNotNullOrEmpty()]
         [string]$DirectoryPath
     )
 
-    process {
-        Write-EnhancedLog -Message "Starting to remove *.intuneWin files from $DirectoryPath recursively." -Level "INFO" -ForegroundColor ([ConsoleColor]::Green)
+    Begin {
+        Write-EnhancedLog -Message "Starting to remove *.intuneWin files from $DirectoryPath recursively." -Level "INFO"
 
+        # Validate directory existence
+        if (-not (Test-Path -Path $DirectoryPath)) {
+            Write-EnhancedLog -Message "Directory not found: $DirectoryPath" -Level "ERROR"
+            throw "Directory not found: $DirectoryPath"
+        }
+    }
+
+    Process {
         try {
-            # Include -Recurse to search within all subdirectories
+            # Get the list of *.intuneWin files recursively
+            Write-EnhancedLog -Message "Searching for *.intuneWin files in $DirectoryPath..." -Level "INFO"
             $files = Get-ChildItem -Path $DirectoryPath -Filter "*.intuneWin" -Recurse -ErrorAction Stop
 
             if ($files.Count -eq 0) {
-                Write-EnhancedLog -Message "No *.intuneWin files found in $DirectoryPath." -Level "INFO" -ForegroundColor ([ConsoleColor]::Yellow)
+                Write-EnhancedLog -Message "No *.intuneWin files found in $DirectoryPath." -Level "INFO"
             }
             else {
                 foreach ($file in $files) {
-                    Remove-Item $file.FullName -Force -ErrorAction Stop
-                    Write-EnhancedLog -Message "Removed file: $($file.FullName)" -Level "INFO" -ForegroundColor ([ConsoleColor]::Green)
+                    if ($PSCmdlet.ShouldProcess($file.FullName, "Remove *.intuneWin file")) {
+                        Remove-Item -Path $file.FullName -Force -ErrorAction Stop
+                        Write-EnhancedLog -Message "Removed file: $($file.FullName)" -Level "INFO"
+                    }
                 }
             }
         }
         catch {
-            Write-EnhancedLog -Message "Error removing *.intuneWin files: $_" -Level "ERROR" -ForegroundColor ([ConsoleColor]::Red)
-            throw $_  # Optionally re-throw the error to handle it further up the call stack.
+            Write-EnhancedLog -Message "Error removing *.intuneWin files: $($_.Exception.Message)" -Level "ERROR"
+            Handle-Error -ErrorRecord $_
+            throw $_  # Re-throwing the error for further handling
         }
+    }
 
-        Write-EnhancedLog -Message "Completed removal of *.intuneWin files from $DirectoryPath recursively." -Level "INFO" -ForegroundColor ([ConsoleColor]::Green)
+    End {
+        Write-EnhancedLog -Message "Completed removal of *.intuneWin files from $DirectoryPath." -Level "INFO"
     }
 }

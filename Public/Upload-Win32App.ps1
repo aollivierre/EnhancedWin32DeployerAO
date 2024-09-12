@@ -1,246 +1,131 @@
 function Upload-Win32App {
+    <#
+    .SYNOPSIS
+    Uploads a Win32 application to Intune.
+
+    .DESCRIPTION
+    The Upload-Win32App function uploads a Win32 application package to Intune, prepares paths, creates the IntuneWin package, and uploads it along with the install and uninstall command lines. It validates that the script is running in PowerShell 5 before proceeding.
+
+    .PARAMETER Prg
+    The application object with necessary details for the upload.
+
+    .PARAMETER Prg_Path
+    The path to the application being uploaded.
+
+    .PARAMETER Prg_img
+    The image associated with the application (optional).
+
+    .PARAMETER Win32AppsRootPath
+    The root path where the Win32 apps are stored (optional).
+
+    .PARAMETER linetoadd
+    Additional lines to add (optional).
+
+    .PARAMETER config
+    Configuration object containing necessary details for installation commands.
+
+    .EXAMPLE
+    $params = @{
+        Prg = [pscustomobject]@{ name = 'ExampleApp'; id = 'exampleApp' }
+        Prg_Path = "C:\Programs\ExampleApp"
+        config = [pscustomobject]@{ InstallCommand = 'install.ps1' }
+    }
+    Upload-Win32App @params
+    Uploads the specified Win32 app to Intune.
+    #>
+
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the application object containing necessary details.")]
+        [ValidateNotNullOrEmpty()]
         [pscustomobject]$Prg,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Prg_Path,
-
-        [string]$Prg_img,
-
-        [string]$Win32AppsRootPath,
-
-        [string]$linetoadd,
-
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$config
-    )
-
-    Write-EnhancedLog -Message "Entering Upload-Win32App" -Level "WARNING"
-    Write-EnhancedLog -Message "Uploading: $($Prg.name)" -Level "WARNING"
-
-    $InstallCommandLines = Set-InstallCommandLine -config $config
-    Log-Params -Params @{
-        Prg      = $Prg
-        Prg_Path = $Prg_Path
-        Prg_img  = $Prg_img
-    }
-
-    $paths = Prepare-Paths -Prg $Prg -Prg_Path $Prg_Path -Win32AppsRootPath $Win32AppsRootPath
-    $IntuneWinFile = Create-IntuneWinPackage -Prg $Prg -Prg_Path $Prg_Path -destinationPath $paths.destinationPath
-
-    Upload-IntuneWinPackage -Prg $Prg -Prg_Path $Prg_Path -Prg_img $Prg_img -config $config -IntuneWinFile $IntuneWinFile -InstallCommandLine $InstallCommandLines.InstallCommandLine -UninstallCommandLine $InstallCommandLines.UninstallCommandLine
-    # Start-Sleep -Seconds 10
-
-    # Write-EnhancedLog -Message "Calling Create-AADGroup for $($Prg.name)" -Level "WARNING"
-    # Create-AADGroup -Prg $Prg
-    # Write-EnhancedLog -Message "Completed Create-AADGroup for $($Prg.name)" -Level "INFO"
-}
-
-function Set-InstallCommandLine {
-    param(
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$config
-    )
-
-    if ($config.serviceUIPSADT -eq $true) {
-        $InstallCommandLine = "ServiceUI.exe -process:explorer.exe Deploy-Application.exe -DeploymentType install -Deploymode Interactive"
-        $UninstallCommandLine = "ServiceUI.exe -process:explorer.exe Deploy-Application.exe -DeploymentType Uninstall -Deploymode Interactive"
-    }
-    elseif ($config.PSADT -eq $true) {
-        $InstallCommandLine = "Deploy-Application.exe -DeploymentType install -DeployMode Interactive"
-        $UninstallCommandLine = "Deploy-Application.exe -DeploymentType Uninstall -DeployMode Interactive"
-    }
-    else {
-        $InstallCommandLine = "%SystemRoot%\sysnative\WindowsPowerShell\v1.0\powershell.exe -windowstyle hidden -executionpolicy bypass -command .\install.ps1"
-        $UninstallCommandLine = "%SystemRoot%\sysnative\WindowsPowerShell\v1.0\powershell.exe -windowstyle hidden -executionpolicy bypass -command .\uninstall.ps1"
-    }
-
-    return @{
-        InstallCommandLine   = $InstallCommandLine
-        UninstallCommandLine = $UninstallCommandLine
-    }
-}
-
-function Prepare-Paths {
-    param(
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$Prg,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Prg_Path,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Win32AppsRootPath
-    )
-
-    if (-not (Test-Path -Path $Prg_Path)) {
-        Write-EnhancedLog -Message "Source path $Prg_Path does not exist. Creating it." -Level "INFO"
-        New-Item -Path $Prg_Path -ItemType Directory -Force
-    }
     
-    $destinationRootPath = Join-Path -Path $Win32AppsRootPath -ChildPath "Win32Apps"
-    if (-not (Test-Path -Path $destinationRootPath)) {
-        New-Item -Path $destinationRootPath -ItemType Directory -Force
-    }
-
-    $destinationPath = Join-Path -Path $destinationRootPath -ChildPath $Prg.name
-    if (-not (Test-Path -Path $destinationPath)) {
-        New-Item -Path $destinationPath -ItemType Directory -Force
-    }
-
-    Write-EnhancedLog -Message "Destination path created: $destinationPath" -Level "INFO"
-    return @{
-        destinationPath = $destinationPath
-    }
-}
-
-function Create-IntuneWinPackage {
-    param(
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$Prg,
-
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, HelpMessage = "Specify the path to the program.")]
+        [ValidateNotNullOrEmpty()]
         [string]$Prg_Path,
-
-        [Parameter(Mandatory = $true)]
-        [string]$destinationPath
-    )
-    try {
-        Write-EnhancedLog -Message "Creating .intunewin package..." -Level "INFO"
-
-        $setupFile = "install.ps1"
-        # $Win32AppPackage = New-IntuneWin32AppPackage -SourceFolder $Prg_Path -SetupFile $setupFile -OutputFolder $destinationPath -Verbose -Force:$true
-
-        # using New-IntuneWinPackage instead of New-IntuneWin32AppPackage because it creates a .intunewin file in a cross-platform way both on Windows and Linux
-        New-IntuneWinPackage -SourcePath $Prg_Path -DestinationPath $destinationPath -SetupFile $setupFile -Verbose
-        # Write-Host "Package creation completed successfully." -ForegroundColor Green
-        Write-EnhancedLog -Message "Package creation completed successfully." -Level "INFO"
-
-        $IntuneWinFile = Join-Path -Path $destinationPath -ChildPath "install.intunewin"
-        
-        # $IntuneWinFile = $Win32AppPackage.Path
-        Write-EnhancedLog -Message "IntuneWinFile path set: $IntuneWinFile" -Level "INFO"
-        return $IntuneWinFile
-    }
-    catch {
-        Write-EnhancedLog -Message "Error creating .intunewin package: $_" -Level "ERROR"
-        Write-Host "Error creating .intunewin package: $_" -ForegroundColor Red
-        exit
-    }
-}
-
-function Upload-IntuneWinPackage {
-    param(
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$Prg,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Prg_Path,
-
-        [Parameter(Mandatory = $true)]
+    
+        [Parameter(HelpMessage = "Specify the image associated with the application (optional).")]
         [string]$Prg_img,
-
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$config,
-
-        [Parameter(Mandatory = $true)]
-        [string]$IntuneWinFile,
-
-        [Parameter(Mandatory = $true)]
-        [string]$InstallCommandLine,
-
-        [Parameter(Mandatory = $true)]
-        [string]$UninstallCommandLine
+    
+        [Parameter(HelpMessage = "Specify the root path where the Win32 apps are stored (optional).")]
+        [string]$Win32AppsRootPath,
+    
+        [Parameter(HelpMessage = "Provide any additional lines to add (optional).")]
+        [string]$linetoadd,
+    
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the configuration object for command lines.")]
+        [ValidateNotNullOrEmpty()]
+        [pscustomobject]$config
     )
+    
 
-    try {
-        $DisplayName = "$($Prg.Name)"
-        Write-EnhancedLog -Message "DisplayName set: $DisplayName" -Level "INFO"
+    Begin {
+        Write-EnhancedLog -Message "Starting Upload-Win32App function" -Level "Notice"
+        Log-Params -Params $PSCmdlet.MyInvocation.BoundParameters
 
-        $DetectionRule = Create-DetectionRule -Prg_Path $Prg_Path
-        $RequirementRule = Create-RequirementRule
-        $Icon = Set-AppIcon -Prg_img $Prg_img
-
-        $IntuneAppParams = @{
-            FilePath                 = $IntuneWinFile
-            Icon                     = $Icon
-            DisplayName              = "$DisplayName ($($config.InstallExperience))"
-            Description              = "$DisplayName ($($config.InstallExperience))"
-            Publisher                = $config.Publisher
-            AppVersion               = $config.AppVersion
-            Developer                = $config.Developer
-            Owner                    = $config.Owner
-            CompanyPortalFeaturedApp = [System.Convert]::ToBoolean($config.CompanyPortalFeaturedApp)
-            InstallCommandLine       = $InstallCommandLine
-            UninstallCommandLine     = $UninstallCommandLine
-            InstallExperience        = $config.InstallExperience
-            RestartBehavior          = $config.RestartBehavior
-            DetectionRule            = $DetectionRule
-            RequirementRule          = $RequirementRule
-            InformationURL           = $config.InformationURL
-            PrivacyURL               = $config.PrivacyURL
-            Verbose                  = $true
+        # Check if running in PowerShell 5
+        if ($PSVersionTable.PSVersion.Major -ne 5) {
+            Write-EnhancedLog -Message "This script must be run in PowerShell 5. Please switch to PowerShell 5 and rerun the script." -Level "ERROR"
+            throw "PowerShell 5 is required for this operation. Halting script execution."
         }
 
-        # Log-Params -Params $IntuneAppParams
-
-        # Create a copy of $IntuneAppParams excluding the $Icon
-        $IntuneAppParamsForLogging = $IntuneAppParams.Clone()
-        $IntuneAppParamsForLogging.Remove('Icon')
-
-        Log-Params -Params $IntuneAppParamsForLogging
-
-        Write-EnhancedLog -Message "Calling Add-IntuneWin32App with IntuneAppParams - in progress" -Level "WARNING"
-        $Win32App = Add-IntuneWin32App @IntuneAppParams
-        Write-EnhancedLog -Message "Win32 app added successfully. App ID: $($Win32App.id)" -Level "INFO"
-
-        Write-EnhancedLog -Message "Assigning Win32 app to all users..." -Level "WARNING"
-        Add-IntuneWin32AppAssignmentAllUsers -ID $Win32App.id -Intent "available" -Notification "showAll" -Verbose
-        Write-EnhancedLog -Message "Assignment completed successfully." -Level "INFO"
+        Write-EnhancedLog -Message "Validated PowerShell 5 environment" -Level "INFO"
     }
-    catch {
-        Write-EnhancedLog -Message "Error during IntuneWin32 app process: $_" -Level "ERROR"
-        Write-Host "Error during IntuneWin32 app process: $_" -ForegroundColor Red
-        exit
+
+    Process {
+        try {
+            if ($PSCmdlet.ShouldProcess("Win32 app: $($Prg.name)", "Upload to Intune")) {
+                Write-EnhancedLog -Message "Uploading: $($Prg.name)" -Level "WARNING"
+    
+                # Set the install and uninstall command lines
+                $InstallCommandLines = Set-InstallCommandLine -config $config
+    
+                # Log parameters
+                Log-Params -Params @{
+                    Prg      = $Prg
+                    Prg_Path = $Prg_Path
+                    Prg_img  = $Prg_img
+                }
+    
+                # Prepare paths for the application
+                $paths = Prepare-Paths -Prg $Prg -Prg_Path $Prg_Path -Win32AppsRootPath $Win32AppsRootPath
+    
+                # Splatting for Create-IntuneWinPackage
+                $createIntuneWinParams = @{
+                    Prg             = $Prg
+                    Prg_Path        = $Prg_Path
+                    destinationPath = $paths.destinationPath
+                }
+                $IntuneWinFile = Create-IntuneWinPackage @createIntuneWinParams
+    
+                # Splatting for Upload-IntuneWinPackage
+                $uploadParams = @{
+                    Prg                  = $Prg
+                    Prg_Path             = $Prg_Path
+                    Prg_img              = $Prg_img
+                    config               = $config
+                    IntuneWinFile        = $IntuneWinFile
+                    InstallCommandLine   = $InstallCommandLines.InstallCommandLine
+                    UninstallCommandLine = $InstallCommandLines.UninstallCommandLine
+                }
+                Upload-IntuneWinPackage @uploadParams
+            }
+            else {
+                Write-EnhancedLog -Message "Operation skipped due to WhatIf or confirmation." -Level "INFO"
+            }
+        }
+        catch {
+            Write-EnhancedLog -Message "Error during Upload-Win32App: $($_.Exception.Message)" -Level "ERROR"
+            Handle-Error -ErrorRecord $_
+            throw
+        }
+        finally {
+            Write-EnhancedLog -Message "Exiting Upload-Win32App function" -Level "Notice"
+        }
     }
-}
+    
 
-function Create-DetectionRule {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Prg_Path
-    )
-
-    Write-EnhancedLog -Message "Creating detection rule..." -Level "WARNING"
-    $detectionScriptPath = Join-Path -Path $Prg_Path -ChildPath "check.ps1"
-    if (-not (Test-Path -Path $detectionScriptPath)) {
-        Write-Warning "Detection rule script file does not exist at path: $detectionScriptPath"
+    End {
+        Write-EnhancedLog -Message "Upload-Win32App completed successfully for $($Prg.name)" -Level "INFO"
     }
-    else {
-        $DetectionRule = New-IntuneWin32AppDetectionRuleScript -ScriptFile $detectionScriptPath -EnforceSignatureCheck $false -RunAs32Bit $false
-    }
-    Write-EnhancedLog -Message "Detection rule set (calling New-IntuneWin32AppDetectionRuleScript) - done" -Level "INFO"
-
-    return $DetectionRule
-}
-
-function Create-RequirementRule {
-    Write-EnhancedLog -Message "Setting minimum requirements..." -Level "WARNING"
-    $RequirementRule = New-IntuneWin32AppRequirementRule -Architecture "x64" -MinimumSupportedWindowsRelease "W10_1607"
-    Write-EnhancedLog -Message "Minimum requirements set - done" -Level "INFO"
-
-    return $RequirementRule
-}
-
-function Set-AppIcon {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Prg_img
-    )
-
-    $Icon = New-IntuneWin32AppIcon -FilePath $Prg_img
-    Write-EnhancedLog -Message "App icon set - done" -Level "INFO"
-
-    return $Icon
 }
