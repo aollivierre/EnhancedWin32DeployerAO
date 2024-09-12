@@ -27,21 +27,19 @@ function Setup-WindowsEnvironment {
 
         try {
             # Set base paths from script path
-            $scriptBasePath = $scriptpath
-            Write-EnhancedLog -Message "Script base path: $scriptBasePath" -Level "INFO"
+            Write-EnhancedLog -Message "Script base path: $scriptpath" -Level "INFO"
 
             # Construct the paths dynamically using the base path
-            $AOscriptDirectory = Join-Path -Path $scriptBasePath -ChildPath "Win32Apps-DropBox"
-            $directoryPath = Join-Path -Path $scriptBasePath -ChildPath "Win32Apps-DropBox"
-            $Repo_Path = $scriptBasePath
-            $Repo_winget = Join-Path -Path $Repo_Path -ChildPath "Win32Apps-DropBox"
+            $AOscriptDirectory = Join-Path -Path $scriptpath -ChildPath "Win32Apps-Source"
+            $directoryPath = Join-Path -Path $scriptpath -ChildPath "Win32Apps-Source"
+            $Repo_winget = Join-Path -Path $scriptpath -ChildPath "Win32Apps-Source"
 
             # Log the dynamically constructed paths
             Log-Params -Params @{
 
                 AOscriptDirectory = $AOscriptDirectory
                 directoryPath     = $directoryPath
-                Repo_Path         = $Repo_Path
+                Repo_Path         = $scriptpath
                 Repo_winget       = $Repo_winget
             }
 
@@ -51,7 +49,7 @@ function Setup-WindowsEnvironment {
             return [pscustomobject]@{
                 AOscriptDirectory = $AOscriptDirectory
                 directoryPath     = $directoryPath
-                Repo_Path         = $Repo_Path
+                Repo_Path         = $scriptpath
                 Repo_winget       = $Repo_winget
             }
         }
@@ -77,7 +75,7 @@ function Setup-WindowsEnvironment {
 # Write-Host "Repository Path: $($envDetails.Repo_Path)"
 # Write-Host "Winget Path: $($envDetails.Repo_winget)"
 
-# AO Script Directory: C:\path\to\Win32Apps-DropBox
-# Directory Path: C:\path\to\Win32Apps-DropBox
+# AO Script Directory: C:\path\to\Win32Apps-Source
+# Directory Path: C:\path\to\Win32Apps-Source
 # Repository Path: C:\path\to\script.ps1
-# Winget Path: C:\path\to\Win32Apps-DropBox
+# Winget Path: C:\path\to\Win32Apps-Source

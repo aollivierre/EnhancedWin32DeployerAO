@@ -15,8 +15,11 @@ function Process-Folder {
     .PARAMETER Repo_winget
     The path to the repository (winget) where the program source resides.
 
+    .PARAMETER scriptpath
+    The path to the script that is being executed.
+
     .EXAMPLE
-    $folderDetails = Process-Folder -Folder (Get-Item "C:\Apps\MyApp") -config $config -Repo_winget "C:\Repo\winget"
+    $folderDetails = Process-Folder -Folder (Get-Item "C:\Apps\MyApp") -config $config -Repo_winget "C:\Repo\winget" -scriptpath "C:\path\to\script"
     Processes the folder and returns the folder processing details.
     #>
 
@@ -32,18 +35,22 @@ function Process-Folder {
 
         [Parameter(Mandatory = $true, HelpMessage = "Provide the path to the winget repository.")]
         [ValidateNotNullOrEmpty()]
-        [string]$Repo_winget
-    )
+        [string]$Repo_winget,
 
-    # Initialize counters and app status list
-    $totalApps = 0
-    $successfulApps = 0
-    $failedApps = 0
-    $appStatuses = [System.Collections.Generic.List[PSCustomObject]]::new()  # Efficient list initialization
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the path to the script being executed.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$scriptpath
+    )
 
     Begin {
         Write-EnhancedLog -Message "Starting Process-Folder function for folder: $($Folder.Name)" -Level "INFO"
         Log-Params -Params $PSCmdlet.MyInvocation.BoundParameters
+
+        # Initialize counters and app status list
+        $totalApps = 0
+        $successfulApps = 0
+        $failedApps = 0
+        $appStatuses = [System.Collections.Generic.List[PSCustomObject]]::new()  # Efficient list initialization
     }
 
     Process {
@@ -69,7 +76,7 @@ function Process-Folder {
             $totalApps++
 
             try {
-                $appDetails = Process-Win32App -Folder $Folder -config $config -Repo_winget $Repo_winget
+                $appDetails = Process-Win32App -Folder $Folder -config $config -Repo_winget $Repo_winget -scriptpath $scriptpath
                 Write-EnhancedLog -Message "Successfully processed Win32 app: $($Folder.Name)" -Level "INFO"
                 $successfulApps++
                 $appStatuses.Add([pscustomobject]@{ AppName = $Folder.Name; Status = "Success" })
@@ -82,9 +89,9 @@ function Process-Folder {
 
             # Build the return object
             $folderDetails = [pscustomobject]@{
-                FolderName        = $Folder.Name
-                PrinterProcessed  = $printerProcessed
-                AppDetails        = $appDetails
+                FolderName       = $Folder.Name
+                PrinterProcessed = $printerProcessed
+                AppDetails       = $appDetails
             }
 
             return $folderDetails
@@ -110,24 +117,14 @@ function Process-Folder {
         foreach ($appStatus in $appStatuses) {
             if ($appStatus.Status -eq "Success") {
                 Write-Host "App: $($appStatus.AppName) - Status: $($appStatus.Status)" -ForegroundColor Green
-            } else {
+            }
+            else {
                 Write-Host "App: $($appStatus.AppName) - Status: $($appStatus.Status)" -ForegroundColor Red
             }
         }
     }
 }
 
+# Example Usage:
+# $folderDetails = Process-Folder -Folder (Get-Item "C:\Apps\MyApp") -config $config -Repo_winget "C:\Repo\winget" -scriptpath "C:\path\to\script"
 
-
-
-# Run Process-Folder and store the returned object
-# $folderDetails = Process-Folder -Folder (Get-Item "C:\Apps\MyApp") -config $config
-
-# # Access the properties of the returned object
-# Write-Host "Folder Name: $($folderDetails.FolderName)"
-# Write-Host "Printer Processed: $($folderDetails.PrinterProcessed)"
-# Write-Host "App Details: $($folderDetails.AppDetails)"
-
-# Folder Name: MyApp
-# Printer Processed: True
-# App Details: @{ProgramID=MyApp; ProgramName=MyApp; SourcePath=C:\path\to\Win32Apps-DropBox\MyApp}

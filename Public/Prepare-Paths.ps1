@@ -41,7 +41,7 @@ function Prepare-Paths {
     }
     
     # Prepare the destination root path and app-specific destination path
-    $destinationRootPath = Join-Path -Path $Win32AppsRootPath -ChildPath "Win32Apps"
+    $destinationRootPath = Join-Path -Path $Win32AppsRootPath -ChildPath "Win32Apps-published"
     if (-not (Test-Path -Path $destinationRootPath)) {
         New-Item -Path $destinationRootPath -ItemType Directory -Force
     }

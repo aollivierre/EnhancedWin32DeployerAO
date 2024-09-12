@@ -1,34 +1,94 @@
 function Create-IntuneWinPackage {
-    param(
-        [Parameter(Mandatory = $true)]
+    <#
+    .SYNOPSIS
+    Creates a .intunewin package for a specified program.
+
+    .DESCRIPTION
+    This function creates a .intunewin package by packaging the source folder and setup file. It logs the process and handles errors. The resulting package path is returned.
+
+    .PARAMETER Prg
+    The program object containing metadata like the program name.
+
+    .PARAMETER Prg_Path
+    The path to the program source folder.
+
+    .PARAMETER destinationPath
+    The destination path where the .intunewin package will be created.
+
+    .EXAMPLE
+    $IntuneWinFile = Create-IntuneWinPackage -Prg $Prg -Prg_Path "C:\Path\To\Program" -destinationPath "C:\Path\To\Destination"
+    Creates the .intunewin package and returns the file path.
+    #>
+
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the program object.")]
+        [ValidateNotNullOrEmpty()]
         [pscustomobject]$Prg,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the program source path.")]
+        [ValidateNotNullOrEmpty()]
         [string]$Prg_Path,
 
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the destination path for the package.")]
+        [ValidateNotNullOrEmpty()]
         [string]$destinationPath
     )
-    try {
-        Write-EnhancedLog -Message "Creating .intunewin package..." -Level "INFO"
 
-        $setupFile = "install.ps1"
-        # $Win32AppPackage = New-IntuneWin32AppPackage -SourceFolder $Prg_Path -SetupFile $setupFile -OutputFolder $destinationPath -Verbose -Force:$true
-
-        # using New-IntuneWinPackage instead of New-IntuneWin32AppPackage because it creates a .intunewin file in a cross-platform way both on Windows and Linux
-        New-IntuneWinPackage -SourcePath $Prg_Path -DestinationPath $destinationPath -SetupFile $setupFile -Verbose
-        # Write-Host "Package creation completed successfully." -ForegroundColor Green
-        Write-EnhancedLog -Message "Package creation completed successfully." -Level "INFO"
-
-        $IntuneWinFile = Join-Path -Path $destinationPath -ChildPath "install.intunewin"
-        
-        # $IntuneWinFile = $Win32AppPackage.Path
-        Write-EnhancedLog -Message "IntuneWinFile path set: $IntuneWinFile" -Level "INFO"
-        return $IntuneWinFile
+    Begin {
+        Write-EnhancedLog -Message "Starting Create-IntuneWinPackage function for program: $($Prg.Name)" -Level "INFO"
+        Log-Params -Params $PSCmdlet.MyInvocation.BoundParameters
     }
-    catch {
-        Write-EnhancedLog -Message "Error creating .intunewin package: $_" -Level "ERROR"
-        Write-Host "Error creating .intunewin package: $_" -ForegroundColor Red
-        exit
+
+    Process {
+        try {
+            Write-EnhancedLog -Message "Creating .intunewin package..." -Level "INFO"
+
+            $setupFile = "install.ps1"
+
+            # Use New-IntuneWinPackage to create the package
+            # New-IntuneWinPackage -SourcePath $Prg_Path -DestinationPath $destinationPath -SetupFile $setupFile -Verbose
+
+            # $Win32AppPackage = New-IntuneWin32AppPackage -SourceFolder $Prg_Path -SetupFile $setupFile -OutputFolder $destinationPath -Verbose -Force:$true
+
+            # Splatting for New-IntuneWin32AppPackage
+            $NewIntuneWinPackageParams = @{
+                SourceFolder = $Prg_Path
+                SetupFile    = $setupFile
+                OutputFolder = $destinationPath
+                Verbose      = $true
+                Force        = $true
+            }
+
+            # Use New-IntuneWin32AppPackage to create the package
+            $Win32AppPackage = New-IntuneWin32AppPackage @NewIntuneWinPackageParams
+
+            Write-EnhancedLog -Message "Package creation completed successfully." -Level "INFO"
+
+            # Set the IntuneWin file path
+            $IntuneWinFile = Join-Path -Path $destinationPath -ChildPath "install.intunewin"
+            Write-EnhancedLog -Message "IntuneWinFile path set: $IntuneWinFile" -Level "INFO"
+
+            # Return the path of the created package
+            return $IntuneWinFile
+        }
+        catch {
+            Write-EnhancedLog -Message "Error creating .intunewin package: $($_.Exception.Message)" -Level "ERROR"
+            Handle-Error -ErrorRecord $_
+            Write-Host "Error creating .intunewin package: $($_.Exception.Message)" -ForegroundColor Red
+            throw
+        }
+    }
+
+    End {
+        Write-EnhancedLog -Message "Completed Create-IntuneWinPackage function for program: $($Prg.Name)" -Level "INFO"
+
+        # Print summary report
+        Write-Host "Summary Report" -ForegroundColor Green
+        Write-Host "-----------------" -ForegroundColor Green
+        Write-Host "Program Name: $($Prg.Name)" -ForegroundColor Green
+        Write-Host "Source Path: $Prg_Path" -ForegroundColor Green
+        Write-Host "Destination Path: $destinationPath" -ForegroundColor Green
+        Write-Host "IntuneWinFile: $IntuneWinFile" -ForegroundColor Green
     }
 }

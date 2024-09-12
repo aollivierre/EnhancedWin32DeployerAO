@@ -15,8 +15,11 @@ function Process-Win32App {
     .PARAMETER Repo_winget
     The path to the repository (winget) where the program source resides.
 
+    .PARAMETER scriptpath
+    The path to the script that is being executed.
+
     .EXAMPLE
-    $appDetails = Process-Win32App -Folder (Get-Item "C:\Programs\MyApp") -config $config -Repo_winget "C:\Repo\winget"
+    $appDetails = Process-Win32App -Folder (Get-Item "C:\Programs\MyApp") -config $config -Repo_winget "C:\Repo\winget" -scriptpath "C:\path\to\script"
     Processes the Win32 app and returns the app details.
     #>
 
@@ -32,7 +35,11 @@ function Process-Win32App {
 
         [Parameter(Mandatory = $true, HelpMessage = "Provide the path to the winget repository.")]
         [ValidateNotNullOrEmpty()]
-        [string]$Repo_winget
+        [string]$Repo_winget,
+
+        [Parameter(Mandatory = $true, HelpMessage = "Provide the path to the script being executed.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$scriptpath
     )
 
     Begin {
@@ -65,7 +72,7 @@ function Process-Win32App {
             Prg               = $Prg
             Prg_Path          = $sourcePathDetails.SourcePath
             Prg_img           = $imageDetails.ImagePath
-            Win32AppsRootPath = $PSScriptRoot
+            Win32AppsRootPath = $scriptpath
             config            = $config
         }
         Upload-Win32App @UploadWin32AppParams
@@ -86,6 +93,11 @@ function Process-Win32App {
         Write-EnhancedLog -Message "Completed processing of Win32 app: $($Prg.name)" -Level "INFO"
     }
 }
+
+# Example Usage:
+# $appDetails = Process-Win32App -Folder (Get-Item "C:\Programs\MyApp") -config $config -Repo_winget "C:\Repo\winget" -scriptpath "C:\path\to\script"
+
+
 
 
 
