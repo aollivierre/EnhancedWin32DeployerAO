@@ -112,6 +112,7 @@ function Upload-IntuneWinPackage {
 
             Write-EnhancedLog -Message "Calling Add-IntuneWin32App with IntuneAppParams - in progress" -Level "WARNING"
             $Win32App = Add-IntuneWin32App @IntuneAppParams
+            #TODO add more logging here to check if Running in PS7 when PS5 is launched from PS7 because it giving a null value error which usually happens when you are running from PS7 as Add-IntuneWin32App uses star-process to start a new session so we might need to call Reset-ModulePaths within a modified version of the Add-IntuneWin32App script and then build a script to copy the modified version of this into the Windows PowerShell Modules folder just like how we are doing with the other function Copy-InvokeAzureStorageBlobUploadFinalize
             Write-EnhancedLog -Message "Win32 app added successfully. App ID: $($Win32App.id)" -Level "INFO"
 
             Write-EnhancedLog -Message "Assigning Win32 app to all users..." -Level "WARNING"
