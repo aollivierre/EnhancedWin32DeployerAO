@@ -51,25 +51,23 @@ function Create-IntuneWinPackage {
             #Option 1: using SvRooij.ContentPrep.Cmdlet Module
 
             # Use New-IntuneWinPackage to create the package
-            New-IntuneWinPackage -SourcePath $Prg_Path -DestinationPath $destinationPath -SetupFile $setupFile -Verbose
+            # New-IntuneWinPackage -SourcePath $Prg_Path -DestinationPath $destinationPath -SetupFile $setupFile -Verbose
 
 
 
             #Option 2: using IntuneWin32App Module
 
-            # $Win32AppPackage = New-IntuneWin32AppPackage -SourceFolder $Prg_Path -SetupFile $setupFile -OutputFolder $destinationPath -Verbose -Force:$true
-
             # Splatting for New-IntuneWin32AppPackage
-            # $NewIntuneWinPackageParams = @{
-            #     SourceFolder = $Prg_Path
-            #     SetupFile    = $setupFile
-            #     OutputFolder = $destinationPath
-            #     Verbose      = $true
-            #     Force        = $true
-            # }
+            $NewIntuneWinPackageParams = @{
+                SourceFolder = $Prg_Path
+                SetupFile    = $setupFile
+                OutputFolder = $destinationPath
+                Verbose      = $true
+                Force        = $true
+            }
 
             # Use New-IntuneWin32AppPackage to create the package
-            # $Win32AppPackage = New-IntuneWin32AppPackage @NewIntuneWinPackageParams
+            $Win32AppPackage = New-IntuneWin32AppPackage @NewIntuneWinPackageParams
 
             Write-EnhancedLog -Message "Package creation completed successfully." -Level "INFO"
 
