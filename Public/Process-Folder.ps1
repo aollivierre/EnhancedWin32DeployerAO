@@ -50,22 +50,37 @@ function Process-Folder {
         $totalApps = 0
         $successfulApps = 0
         $failedApps = 0
-        $appStatuses = [System.Collections.Generic.List[PSCustomObject]]::new()  # Efficient list initialization
+        $appStatuses = [System.Collections.Generic.List[PSCustomObject]]::new()
     }
 
     Process {
         try {
             # Initialize a variable to track if printer installation was processed
             $printerProcessed = $false
+            $printerCommands = $null
+
+            # Create a copy of the config object to modify
+            $localConfig = $config.PSObject.Copy()
 
             # Construct the path to the printer.json within the current folder
             $printerConfigPath = Join-Path -Path $Folder.FullName -ChildPath "printer.json"
+            $appConfigPath = Join-Path -Path $Folder.FullName -ChildPath "config.json"
 
             if (Test-Path -Path $printerConfigPath) {
                 Write-EnhancedLog -Message "printer.json found in folder: $($Folder.Name). Processing printer installation." -Level "INFO"
-                Process-PrinterInstallation -PrinterConfigPath $printerConfigPath
+                $printerCommands = Process-PrinterInstallation -PrinterConfigPath $printerConfigPath -AppConfigPath $appConfigPath
                 Write-EnhancedLog -Message "Processed printer installation for folder: $($Folder.Name)" -Level "INFO"
                 $printerProcessed = $true
+
+                # Update the config object with printer-specific commands if printer installation was processed
+                if ($printerProcessed -and $printerCommands) {
+                    Write-EnhancedLog -Message "Setting printer-specific install command: $($printerCommands.InstallCommand)" -Level "INFO"
+                    Write-EnhancedLog -Message "Setting printer-specific uninstall command: $($printerCommands.UninstallCommand)" -Level "INFO"
+                    
+                    $localConfig | Add-Member -NotePropertyName 'InstallCommandLine' -NotePropertyValue $printerCommands.InstallCommand -Force
+                    $localConfig | Add-Member -NotePropertyName 'UninstallCommandLine' -NotePropertyValue $printerCommands.UninstallCommand -Force
+                    $localConfig | Add-Member -NotePropertyName 'PrinterInstall' -NotePropertyValue $true -Force
+                }
             }
             else {
                 Write-EnhancedLog -Message "printer.json not found in folder: $($Folder.Name)" -Level "WARNING"
@@ -76,7 +91,8 @@ function Process-Folder {
             $totalApps++
 
             try {
-                $appDetails = Process-Win32App -Folder $Folder -config $config -Repo_winget $Repo_winget -scriptpath $scriptpath
+                # Pass the modified config object to Process-Win32App
+                $appDetails = Process-Win32App -Folder $Folder -config $localConfig -Repo_winget $Repo_winget -scriptpath $scriptpath
                 Write-EnhancedLog -Message "Successfully processed Win32 app: $($Folder.Name)" -Level "INFO"
                 $successfulApps++
                 $appStatuses.Add([pscustomobject]@{ AppName = $Folder.Name; Status = "Success" })
@@ -91,6 +107,7 @@ function Process-Folder {
             $folderDetails = [pscustomobject]@{
                 FolderName       = $Folder.Name
                 PrinterProcessed = $printerProcessed
+                PrinterCommands  = $printerCommands
                 AppDetails       = $appDetails
             }
 
@@ -113,7 +130,6 @@ function Process-Folder {
         Write-Host "Successful Apps: $successfulApps" -ForegroundColor Green
         Write-Host "Failed Apps: $failedApps" -ForegroundColor Red
 
-        # Loop through appStatuses for detailed report
         foreach ($appStatus in $appStatuses) {
             if ($appStatus.Status -eq "Success") {
                 Write-Host "App: $($appStatus.AppName) - Status: $($appStatus.Status)" -ForegroundColor Green
